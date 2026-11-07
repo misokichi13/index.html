@@ -164,7 +164,7 @@
   <div class="card">
     <h3>1. Gemini APIキーの設定</h3>
     <input type="password" id="apiKeyInput" placeholder="APIキーを入力してください">
-    <small style="color:#666;">※APIキーはブラウザ内でのみ使用されます。</small>
+    <small style="color:#666;">※APIキーはブラウザ内に保存され、次回から入力を省略できます。</small>
   </div>
 
   <!-- 2. 音声ファイル選択 & プレイヤー -->
@@ -218,6 +218,13 @@
 
     let selectedFile = null;
     let fullResultData = null;
+
+    // APIキーはブラウザ内に保存し、次回から入力を省略できるようにする
+    // （他の自作ツールと同じ localStorage のキー名 'gemini_api_key' を使う）
+    apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+    apiKeyInput.addEventListener('change', () => {
+      localStorage.setItem('gemini_api_key', apiKeyInput.value.trim());
+    });
 
     audioFileInput.addEventListener('change', (event) => {
       selectedFile = event.target.files[0];
@@ -357,7 +364,13 @@
 
     async function waitForFileActive(fileObj, apiKey) {
       const getUrl = `https://generativelanguage.googleapis.com/v1beta/${fileObj.name}?key=${apiKey}`;
+      let attempts = 0;
       while (true) {
+        // 処理が終わらないまま待ち続けないよう、約2分（120回）でタイムアウトにする
+        attempts++;
+        if (attempts > 120) {
+          throw new Error('ファイルの処理がタイムアウトしました（約2分）。時間をおいて再試行してください。');
+        }
         const response = await fetch(getUrl);
         if (!response.ok) {
           const errJson = await response.json().catch(() => ({}));
@@ -426,6 +439,7 @@
         alert('Gemini APIキーを入力してください。');
         return;
       }
+      localStorage.setItem('gemini_api_key', apiKey);
       if (!selectedFile) {
         alert('音声ファイルを選択してください。');
         return;
